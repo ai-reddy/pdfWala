@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Official Next.js runtime — handles App Router, route handlers (as functions),
+# and image optimization on Netlify.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
