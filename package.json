@@ -4,7 +4,9 @@
   "private": true,
   "description": "pdfWala — Complete PDF toolkit (iLovePDF-parity) built on a Tool → Job → Operation → Engine architecture.",
   "scripts": {
+    "predev": "node scripts/copy-pdf-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-pdf-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -14,8 +16,10 @@
     "jszip": "^3.10.1",
     "next": "14.2.5",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "4.7.76",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
     "@types/node": "20.14.10",

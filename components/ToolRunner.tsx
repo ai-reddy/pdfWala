@@ -67,6 +67,15 @@ export function ToolRunner({ tool }: { tool: ToolDef }) {
     setError("");
     setResult(null);
     try {
+      // Rendering/OCR tools run entirely in the browser.
+      if (tool.runtime === "client") {
+        const { runClient } = await import("@/lib/client/operations");
+        const out = await runClient(tool.operation, files, options);
+        setResult({ url: URL.createObjectURL(out.blob), filename: out.filename });
+        setStatus("done");
+        return;
+      }
+
       const form = new FormData();
       form.append("operation", tool.operation);
       form.append("options", JSON.stringify(options));
@@ -88,7 +97,7 @@ export function ToolRunner({ tool }: { tool: ToolDef }) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setStatus("error");
     }
-  }, [files, options, tool.operation]);
+  }, [files, options, tool.operation, tool.runtime]);
 
   const reset = () => {
     setFiles([]);
