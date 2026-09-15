@@ -60,7 +60,7 @@ export default function HomePage() {
                 );
 
                 return tool.implemented ? (
-                  <Link key={tool.slug} href={`/tools/${tool.slug}`}>
+                  <Link key={tool.slug} href={tool.href ?? `/tools/${tool.slug}`}>
                     {card}
                   </Link>
                 ) : (

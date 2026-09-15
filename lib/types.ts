@@ -92,6 +92,9 @@ export interface ToolDef {
   // Where processing happens. Rendering-heavy tools run in the browser.
   runtime?: "server" | "client";
   isNew?: boolean;
+  // Optional custom destination. When set, the card links here instead of the
+  // generic /tools/[slug] shell (used by the standalone Pro PDF Editor).
+  href?: string;
 }
 
 export interface EngineInput {

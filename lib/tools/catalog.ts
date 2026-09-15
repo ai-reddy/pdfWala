@@ -384,6 +384,20 @@ export const TOOLS: ToolDef[] = [
 
   // ---------------- Edit ----------------
   {
+    slug: "pro-pdf-editor",
+    operation: "edit",
+    name: "Pro PDF Editor",
+    category: "edit",
+    description:
+      "Full editor: edit text, add images, links, shapes, whiteout, annotations, form fields, find & replace and signatures.",
+    accept: "application/pdf",
+    multiple: true,
+    implemented: true,
+    isNew: true,
+    href: "/editor",
+    options: [],
+  },
+  {
     slug: "edit-pdf",
     operation: "edit",
     name: "Edit PDF",

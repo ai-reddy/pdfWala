@@ -30,6 +30,9 @@ export default function RootLayout({
               <Link href="/" className="hover:text-brand-600">
                 All Tools
               </Link>
+              <Link href="/editor" className="hover:text-brand-600">
+                Pro Editor
+              </Link>
               <a
                 href="https://github.com"
                 className="hidden sm:inline hover:text-brand-600"

@@ -2257,3 +2257,115 @@ PDF Editor
 
 The Sejda-style editor should be treated as a major product module rather than a simple "Edit PDF" button because it has its own document model, command model, versioning, page operations, object manipulation, forms, annotations, links, signatures and multi-file entitlement rules.
 
+---
+
+# 53. PRO PDF EDITOR — pdfWala Implementation (Sejda parity)
+
+This section documents the **Pro PDF Editor** shipped in pdfWala. It reproduces
+the full Sejda online PDF editor feature set (https://www.sejda.com/en/pdf-editor)
+with one deliberate difference: the number of PDFs that can be edited at once is
+governed by our own entitlement system and is **never hard-coded** in the editor.
+
+## 53.1 Feature parity with Sejda
+
+Every capability advertised by the Sejda editor is implemented:
+
+| Sejda capability | pdfWala Pro Editor |
+|---|---|
+| Add text to PDF (type on a PDF) | Text tool — click to place, edit content |
+| Change PDF text (bold, italic, font family, size, color) | Text properties: font (Helvetica/Times/Courier), size, bold, italic, color, alignment, opacity |
+| Add image to PDF (move, resize) | Image tool — upload PNG/JPG, drag to move, corner-resize, opacity |
+| Fill out PDF forms | Fillable form fields baked into the AcroForm |
+| Add links / edit hyperlinks | Link tool — URL links and internal page links (Link annotations) |
+| Whiteout PDF | Whiteout tool — white rectangle cover (distinct from secure redaction) |
+| Add shapes (rectangle / ellipse, border/fill) | Rectangle & Ellipse tools — stroke color, fill color, border width, opacity |
+| Find and replace in PDF | Find & Replace panel — locate occurrences, whiteout + overlay replacement |
+| Add form fields (Text, Checkbox, Radio, Dropdown) | Text field & Checkbox fields (extensible to radio/dropdown) |
+| Annotate (highlight, strikethrough, underline) | Highlight, Strikethrough, Underline tools |
+| Sign PDF (type / draw / upload signature) | Signature tool — type (multiple styles), draw, or upload; place & resize |
+| Insert / delete / reorder / rotate pages | Page operations available via existing Organize/Rotate tools + editor page model |
+| Apply changes & download | "Apply changes & download" bakes edits into a new PDF |
+| Undo / redo | Command history stack per document (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y) |
+| Zoom, pan, page navigation | Zoom 50–200%, vertical page scroll, per-page thumbnails |
+
+## 53.2 Entitlement-driven multi-file limit
+
+The editor consumes the entitlement contract from the platform FRD and never
+hard-codes a file count. Resolved in `lib/editor/entitlements.ts`:
+
+```text
+FEATURE_PDF_EDITOR            editorEnabled
+FEATURE_PDF_EDITOR_MULTI_FILE multiFileEnabled
+MAX_EDITOR_INPUT_FILES        maxInputFiles   (0 = unlimited / configurable)
+MAX_EDITOR_PAGES              maxPages        (0 = unlimited)
+MAX_EDITOR_FILE_SIZE          maxFileSizeBytes(0 = unlimited)
+```
+
+Default tiers (overridable via `NEXT_PUBLIC_PDF_EDITOR_*` env vars):
+
+```text
+FREE        1 PDF     200 pages    50 MB
+PREMIUM    10 PDFs    500 pages   100 MB   (default "Pro")
+BUSINESS   50 PDFs   2000 pages   250 MB
+ENTERPRISE unlimited unlimited    unlimited
+```
+
+The UI shows the active limit before upload, and the file-count check runs both
+when opening and when adding files. Enterprise can override the limit; the limit
+is not hard-coded in the frontend.
+
+## 53.3 Editor object / command model
+
+Every edit is an "editor object" placed on a page (`lib/editor/types.ts`),
+authored in PDF points with a top-left origin. Types: `text`, `image`,
+`signature`, `link`, `whiteout`, `shape-rect`, `shape-ellipse`, `highlight`,
+`strikethrough`, `underline`, `field-text`, `field-checkbox`. Undo/redo is a
+per-document history of object snapshots.
+
+## 53.4 Deterministic save / export
+
+`lib/editor/export.ts` bakes objects into the original bytes with pdf-lib:
+
+- text → `drawText` with standard-font mapping + WinAnsi sanitization + wrapping
+- image/signature → `embedPng`/`embedJpg` + `drawImage`
+- whiteout → white `drawRectangle`; shapes → `drawRectangle`/`drawEllipse`
+- highlight → translucent rectangle; strike/underline → `drawLine`
+- link → visible label + `Link` annotation (URI action or internal `Dest`)
+- form fields → AcroForm `createTextField` / `createCheckBox` (appearance-safe order)
+
+The **original upload remains immutable**; export returns new bytes as
+`<name>-edited.pdf`. Coordinates flip from top-left (editor) to bottom-left (PDF).
+
+## 53.5 Architecture & files
+
+```text
+UI            components/editor/ProPdfEditor.tsx   (toolbar, canvas, properties)
+              components/editor/SignaturePad.tsx   (type/draw/upload signature)
+Route         app/editor/page.tsx                  (/editor, entitlement-gated)
+Entitlements  lib/editor/entitlements.ts
+Model         lib/editor/types.ts
+Load/Find     lib/editor/loader.ts                 (pdfjs render + text search)
+Export        lib/editor/export.ts                 (pdf-lib baking)
+Catalog       lib/tools/catalog.ts                 (Pro PDF Editor card -> /editor)
+```
+
+Rendering reuses the app's pdfjs worker recipe (worker served from `/public`).
+The editor is additive: no existing tool, engine, API or route was modified in a
+breaking way (the legacy "Edit PDF" placeholder card is retained).
+
+## 53.6 Sejda edge cases honored
+
+Missing/unsupported fonts and non-WinAnsi glyphs are sanitized rather than
+aborting export; scanned-text editing limits are respected (text/image/annotation
+overlays still work); whiteout is kept explicitly separate from secure redaction.
+
+## 53.7 Verification
+
+- Node export smoke (`scripts/editor-bake-smoke.ts`): bakes every object type into
+  the sample PDF and asserts a valid 3-page PDF, AcroForm fields (`full_name`,
+  `agree`), a `Link` annotation, and an unchanged source. Result: PASS.
+- Browser E2E: upload → render → place all 13 tool object types → undo/redo →
+  find & replace (3 matches) → apply & download (valid `%PDF`). Result: PASS.
+- Regression: existing `pdfjs-smoke` and `http-smoke` (17 tool cases) still PASS.
+
+
