@@ -30,3 +30,7 @@ next-env.d.ts
 # Editor
 .vscode/*
 !.vscode/extensions.json
+
+# Generated at build time (scripts/copy-pdf-worker.mjs) and test fixtures
+/public/pdf.worker.min.mjs
+/scripts/sample.pdf

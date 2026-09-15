@@ -89,6 +89,8 @@ export interface ToolDef {
   options: OptionField[];
   // Whether a working engine implementation exists yet.
   implemented: boolean;
+  // Where processing happens. Rendering-heavy tools run in the browser.
+  runtime?: "server" | "client";
   isNew?: boolean;
 }
 
