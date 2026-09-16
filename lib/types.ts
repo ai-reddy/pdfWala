@@ -8,7 +8,11 @@ export type ToolCategory =
   | "edit"
   | "security"
   | "sign"
-  | "ai";
+  | "ai"
+  | "image"
+  | "barcode"
+  | "label"
+  | "career";
 
 export type OperationId =
   | "merge"
@@ -44,7 +48,21 @@ export type OperationId =
   | "sign"
   | "summarize"
   | "translate"
-  | "extract-data";
+  | "extract-data"
+  | "image-editor"
+  | "remove-background"
+  | "barcode-generate"
+  | "qr-generate"
+  | "scan-codes"
+  | "batch-barcode-generate"
+  | "batch-qr-generate"
+  | "barcode-to-pdf"
+  | "qr-to-pdf"
+  | "add-barcode-to-pdf"
+  | "add-qr-to-pdf"
+  | "product-label"
+  | "shipping-label"
+  | "resume-builder";
 
 // Declarative option schema so the tool shell can render forms generically.
 export type OptionField =
