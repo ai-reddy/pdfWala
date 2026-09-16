@@ -25,6 +25,13 @@ const nextConfig = {
       path: false,
       crypto: false,
     };
+    // onnxruntime-web (used by @imgly/background-removal) ships .mjs files
+    // that webpack otherwise parses as CommonJS, tripping on `import.meta`.
+    config.module.rules.push({
+      test: /\.mjs$/,
+      include: /node_modules/,
+      type: "javascript/auto",
+    });
     return config;
   },
 };

@@ -1,5 +1,7 @@
-import { PDFDocument, degrees, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, degrees, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 import JSZip from "jszip";
+import mammoth from "mammoth";
+import { Document as DocxDocument, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import type { EngineInput, EngineResult, OperationHandler } from "../types";
 import { parsePageList, parseRangeGroups } from "./pageRange";
 import { extractTextByPage } from "./text";
@@ -7,6 +9,8 @@ import { extractTextByPage } from "./text";
 const PDF_MIME = "application/pdf";
 const ZIP_MIME = "application/zip";
 const MD_MIME = "text/markdown";
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function requirePdf(inputs: EngineInput[], min = 1): void {
   if (inputs.length < min) {
@@ -201,6 +205,180 @@ const jpgToPdf: OperationHandler = async (inputs, options) => {
 
   const bytes = await out.save();
   return { filename: "images.pdf", mimeType: PDF_MIME, bytes };
+};
+
+// -------------------- Convert (Word <-> PDF) --------------------
+
+// A basic HTML block model: mammoth's output is simple/flat enough that a
+// regex-based block splitter (rather than a full HTML/DOM parser) is enough
+// for MVP text+heading fidelity. Bold/italic/inline styling and images inside
+// the document body are intentionally not preserved yet.
+interface DocBlock {
+  kind: "h1" | "h2" | "h3" | "p" | "li";
+  text: string;
+}
+
+function decodeHtmlEntities(input: string): string {
+  return input
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+function stripTags(html: string): string {
+  return decodeHtmlEntities(html.replace(/<[^>]+>/g, "")).trim();
+}
+
+function htmlToBlocks(html: string): DocBlock[] {
+  const blocks: DocBlock[] = [];
+  const blockRe =
+    /<(h1|h2|h3|h4|h5|h6|p|li)[^>]*>([\s\S]*?)<\/\1>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = blockRe.exec(html))) {
+    const tag = match[1].toLowerCase();
+    const text = stripTags(match[2]);
+    if (!text) continue;
+    const kind: DocBlock["kind"] =
+      tag === "h1"
+        ? "h1"
+        : tag === "h2" || tag === "h3"
+          ? "h2"
+          : tag === "li"
+            ? "li"
+            : tag.startsWith("h")
+              ? "h3"
+              : "p";
+    blocks.push({ kind, text });
+  }
+  if (!blocks.length) {
+    const text = stripTags(html);
+    if (text) blocks.push({ kind: "p", text });
+  }
+  return blocks;
+}
+
+function wrapLine(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(candidate, size) > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+const wordToPdf: OperationHandler = async (inputs) => {
+  if (!inputs.length) throw new Error("Upload a DOC/DOCX file.");
+  const input = inputs[0];
+  const lower = input.name.toLowerCase();
+  if (!lower.endsWith(".docx")) {
+    throw new Error(
+      "Only .docx files are supported. Save legacy .doc files as .docx and try again."
+    );
+  }
+
+  let html: string;
+  try {
+    const result = await mammoth.convertToHtml({
+      buffer: Buffer.from(input.bytes),
+    });
+    html = result.value;
+  } catch {
+    throw new Error(`Could not read "${input.name}". It may be corrupted.`);
+  }
+
+  const blocks = htmlToBlocks(html);
+  if (!blocks.length) throw new Error("The document does not contain any readable text.");
+
+  const doc = await PDFDocument.create();
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 56;
+  const maxWidth = pageWidth - margin * 2;
+
+  let page = doc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+
+  const ensureSpace = (needed: number) => {
+    if (y - needed < margin) {
+      page = doc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+  };
+
+  for (const block of blocks) {
+    const size = block.kind === "h1" ? 20 : block.kind === "h2" ? 16 : block.kind === "h3" ? 13 : 11;
+    const font = block.kind === "p" || block.kind === "li" ? regular : bold;
+    const lineHeight = size * 1.4;
+    const prefix = block.kind === "li" ? "\u2022 " : "";
+    const lines = wrapLine(font, prefix + block.text, size, maxWidth);
+
+    ensureSpace(lineHeight);
+    if (block.kind !== "p" && block.kind !== "li") y -= lineHeight * 0.3;
+
+    for (const line of lines) {
+      ensureSpace(lineHeight);
+      page.drawText(line, { x: margin, y, size, font, color: rgb(0.1, 0.1, 0.1) });
+      y -= lineHeight;
+    }
+    if (block.kind !== "p" && block.kind !== "li") y -= lineHeight * 0.2;
+  }
+
+  const bytes = await doc.save();
+  return {
+    filename: input.name.replace(/\.docx$/i, "") + ".pdf",
+    mimeType: PDF_MIME,
+    bytes,
+  };
+};
+
+const pdfToWord: OperationHandler = async (inputs) => {
+  requirePdf(inputs);
+  const pages = await extractTextByPage(inputs[0].bytes);
+
+  const children: Paragraph[] = [];
+  for (const page of pages) {
+    if (!page.lines.length) continue;
+    for (const line of page.lines) {
+      const isHeading =
+        line === line.toUpperCase() && /^[A-Z0-9][A-Z0-9 ,.&:'\-/]{2,59}$/.test(line);
+      children.push(
+        new Paragraph(
+          isHeading
+            ? { text: line, heading: HeadingLevel.HEADING_2 }
+            : { children: [new TextRun(line)] }
+        )
+      );
+    }
+    children.push(new Paragraph({ children: [new TextRun("")] }));
+  }
+  if (!children.length) {
+    throw new Error(
+      "No extractable text was found. Scanned PDFs need OCR first."
+    );
+  }
+
+  const docxDoc = new DocxDocument({ sections: [{ children }] });
+  const buffer = await Packer.toBuffer(docxDoc);
+  const bytes = new Uint8Array(buffer);
+  return {
+    filename: inputs[0].name.replace(/\.pdf$/i, "") + ".docx",
+    mimeType: DOCX_MIME,
+    bytes,
+  };
 };
 
 // -------------------- Edit --------------------
@@ -451,6 +629,8 @@ export const operations: Partial<Record<string, OperationHandler>> = {
   compress,
   repair,
   "jpg-to-pdf": jpgToPdf,
+  "word-to-pdf": wordToPdf,
+  "pdf-to-word": pdfToWord,
   "pdf-to-markdown": pdfToMarkdown,
   "smart-split": smartSplit,
   watermark,

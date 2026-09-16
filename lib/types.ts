@@ -8,7 +8,13 @@ export type ToolCategory =
   | "edit"
   | "security"
   | "sign"
-  | "ai";
+  | "ai"
+  | "image"
+  | "barcode"
+  | "label"
+  | "career"
+  | "calculators"
+  | "text";
 
 export type OperationId =
   | "merge"
@@ -44,7 +50,36 @@ export type OperationId =
   | "sign"
   | "summarize"
   | "translate"
-  | "extract-data";
+  | "extract-data"
+  | "image-editor"
+  | "remove-background"
+  | "barcode-generate"
+  | "qr-generate"
+  | "scan-codes"
+  | "batch-barcode-generate"
+  | "batch-qr-generate"
+  | "barcode-to-pdf"
+  | "qr-to-pdf"
+  | "add-barcode-to-pdf"
+  | "add-qr-to-pdf"
+  | "product-label"
+  | "shipping-label"
+  | "resume-builder"
+  | "percentage-calculator"
+  | "gst-calculator"
+  | "emi-calculator"
+  | "discount-calculator"
+  | "age-calculator"
+  | "date-difference"
+  | "unit-converter"
+  | "currency-converter"
+  | "json-formatter"
+  | "json-validator"
+  | "word-counter"
+  | "character-counter"
+  | "image-resize"
+  | "image-compress"
+  | "image-convert";
 
 // Declarative option schema so the tool shell can render forms generically.
 export type OptionField =
@@ -92,6 +127,9 @@ export interface ToolDef {
   // Where processing happens. Rendering-heavy tools run in the browser.
   runtime?: "server" | "client";
   isNew?: boolean;
+  // Optional custom destination. When set, the card links here instead of the
+  // generic /tools/[slug] shell (used by the standalone Pro PDF Editor).
+  href?: string;
 }
 
 export interface EngineInput {
