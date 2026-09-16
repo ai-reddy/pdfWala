@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import "./globals.css";
 
 export const metadata: Metadata = {
   title: "pdfWala — Every PDF tool in one place",
@@ -33,12 +32,6 @@ export default function RootLayout({
               <Link href="/editor" className="hover:text-brand-600">
                 Pro Editor
               </Link>
-              <a
-                href="https://github.com"
-                className="hidden sm:inline hover:text-brand-600"
-              >
-                Docs
-              </a>
             </nav>
           </div>
         </header>

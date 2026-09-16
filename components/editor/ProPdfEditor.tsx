@@ -50,6 +50,7 @@ type ToolMeta = { tool: EditorTool; label: string; icon: string; hint: string };
 
 const TOOLS: ToolMeta[] = [
   { tool: "select", label: "Select", icon: "⤢", hint: "Select, move and resize objects" },
+  { tool: "edit-text", label: "Edit text", icon: "✎", hint: "Click existing PDF text to edit it, keeping its font, size and color" },
   { tool: "text", label: "Text", icon: "T", hint: "Click to add text" },
   { tool: "image", label: "Image", icon: "🖼", hint: "Add an image" },
   { tool: "link", label: "Link", icon: "🔗", hint: "Add a URL or page link" },
@@ -369,6 +370,11 @@ export function ProPdfEditor({ entitlements }: Props) {
       return;
     }
 
+    if (tool === "edit-text") {
+      handleEditTextClick(pageIndex, x, y);
+      return;
+    }
+
     // image/signature require a pending asset
     if (tool === "image" && !pendingImage.current) {
       imageInputRef.current?.click();
@@ -623,11 +629,11 @@ export function ProPdfEditor({ entitlements }: Props) {
         width: Math.max(40, m.width + 20),
         height: m.height,
         text: replaceValue,
-        fontFamily: "Helvetica",
-        fontSize: Math.max(8, m.height / 1.3),
-        bold: false,
-        italic: false,
-        color: "#111827",
+        fontFamily: m.fontFamily,
+        fontSize: Math.max(6, m.fontSize),
+        bold: m.bold,
+        italic: m.italic,
+        color: m.color,
         align: "left",
         opacity: 1,
       });
@@ -636,6 +642,75 @@ export function ProPdfEditor({ entitlements }: Props) {
     setNotice(`Replaced ${matches.length} occurrence(s). Review before applying.`);
     setFindCount(matches.length);
   }, [activeDoc, findQuery, replaceValue, setObjects]);
+
+  // ---------------- Click-to-edit existing text ----------------
+
+  const handleEditTextClick = useCallback(
+    async (pageIndex: number, x: number, y: number) => {
+      if (!activeDoc) return;
+      // Re-editing a run that was already converted: select it instead of
+      // stacking a duplicate whiteout+text pair on top.
+      const currentObjects = objectsByDoc[activeDocId] ?? [];
+      const already = currentObjects.find(
+        (o) =>
+          o.type === "text" &&
+          o.page === pageIndex &&
+          x >= o.x &&
+          x <= o.x + o.width &&
+          y >= o.y &&
+          y <= o.y + o.height
+      );
+      if (already) {
+        setSelectedId(already.id);
+        setTool("select");
+        return;
+      }
+
+      const { findTextRunAtPoint } = await import("@/lib/editor/loader");
+      const run = await findTextRunAtPoint(activeDoc.bytes, pageIndex, x, y);
+      if (!run) {
+        setNotice("No text found there — click directly on a word.");
+        setTool("select");
+        return;
+      }
+
+      const whiteoutId = newId();
+      const textId = newId();
+      setObjects((prev) => [
+        ...prev,
+        {
+          id: whiteoutId,
+          type: "whiteout",
+          page: pageIndex,
+          x: run.x - 1,
+          y: run.y - 1,
+          width: run.width + 2,
+          height: run.height + 2,
+        },
+        {
+          id: textId,
+          type: "text",
+          page: pageIndex,
+          x: run.x,
+          y: run.y,
+          width: Math.max(20, run.width + 6),
+          height: run.height,
+          text: run.text,
+          fontFamily: run.fontFamily,
+          fontSize: Math.max(6, run.fontSize),
+          bold: run.bold,
+          italic: run.italic,
+          color: run.color,
+          align: "left",
+          opacity: 1,
+        },
+      ]);
+      setSelectedId(textId);
+      setTool("select");
+      setNotice("Edit the text in the panel on the right — font, size and color were matched from the PDF.");
+    },
+    [activeDoc, activeDocId, objectsByDoc, setObjects]
+  );
 
   // ---------------- Export ----------------
 
@@ -827,7 +902,7 @@ export function ProPdfEditor({ entitlements }: Props) {
                   style={{
                     width: pg.widthPts * zoom,
                     height: pg.heightPts * zoom,
-                    cursor: tool === "select" ? "default" : "crosshair",
+                    cursor: tool === "select" ? "default" : tool === "edit-text" ? "text" : "crosshair",
                   }}
                   onPointerDown={(e) => {
                     createPageRef.current = e.currentTarget;
@@ -840,6 +915,14 @@ export function ProPdfEditor({ entitlements }: Props) {
                     alt={`Page ${pg.index}`}
                     draggable={false}
                     className="pointer-events-none absolute inset-0 h-full w-full select-none"
+                  />
+                  <PageTextLayer
+                    bytes={activeDoc.bytes}
+                    pageNumber={pg.index}
+                    widthPts={pg.widthPts}
+                    heightPts={pg.heightPts}
+                    zoom={zoom}
+                    interactive={tool === "select"}
                   />
                   {pageObjects.map((o) => (
                     <ObjectView
@@ -901,6 +984,62 @@ export function ProPdfEditor({ entitlements }: Props) {
         />
       )}
     </div>
+  );
+}
+
+// ---------------- Selectable text layer ----------------
+
+// Overlays the page's real text as invisible, natively selectable spans
+// (pdfjs TextLayer, same mechanism the pdfjs viewer/Sejda use) so users can
+// select and copy text from the raster preview underneath.
+function PageTextLayer({
+  bytes,
+  pageNumber,
+  widthPts,
+  heightPts,
+  zoom,
+  interactive,
+}: {
+  bytes: Uint8Array;
+  pageNumber: number;
+  widthPts: number;
+  heightPts: number;
+  zoom: number;
+  interactive: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let handle: { cancel: () => void } | null = null;
+    (async () => {
+      const { renderPageTextLayer } = await import("@/lib/editor/loader");
+      const el = containerRef.current;
+      if (!el || cancelled) return;
+      handle = await renderPageTextLayer(bytes, pageNumber, el);
+      if (cancelled) handle.cancel();
+    })();
+    return () => {
+      cancelled = true;
+      handle?.cancel();
+    };
+  }, [bytes, pageNumber]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="textLayer"
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: widthPts,
+        height: heightPts,
+        transform: `scale(${zoom})`,
+        transformOrigin: "0 0",
+        pointerEvents: interactive ? "auto" : "none",
+      }}
+    />
   );
 }
 

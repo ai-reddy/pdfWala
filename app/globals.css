@@ -22,3 +22,24 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Pro PDF Editor — selectable text layer overlaid on the raster page preview.
+   Mirrors pdfjs's own viewer styling so native text selection/copy works. */
+.textLayer {
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+}
+
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer ::selection {
+  background: rgba(37, 99, 235, 0.35);
+}
