@@ -8,6 +8,7 @@
 
 export type EditorTool =
   | "select"
+  | "edit-text"
   | "text"
   | "image"
   | "link"

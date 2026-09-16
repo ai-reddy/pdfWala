@@ -33,12 +33,6 @@ export default function RootLayout({
               <Link href="/editor" className="hover:text-brand-600">
                 Pro Editor
               </Link>
-              <a
-                href="https://github.com"
-                className="hidden sm:inline hover:text-brand-600"
-              >
-                Docs
-              </a>
             </nav>
           </div>
         </header>
