@@ -12,7 +12,9 @@ export type ToolCategory =
   | "image"
   | "barcode"
   | "label"
-  | "career";
+  | "career"
+  | "calculators"
+  | "text";
 
 export type OperationId =
   | "merge"
@@ -62,7 +64,22 @@ export type OperationId =
   | "add-qr-to-pdf"
   | "product-label"
   | "shipping-label"
-  | "resume-builder";
+  | "resume-builder"
+  | "percentage-calculator"
+  | "gst-calculator"
+  | "emi-calculator"
+  | "discount-calculator"
+  | "age-calculator"
+  | "date-difference"
+  | "unit-converter"
+  | "currency-converter"
+  | "json-formatter"
+  | "json-validator"
+  | "word-counter"
+  | "character-counter"
+  | "image-resize"
+  | "image-compress"
+  | "image-convert";
 
 // Declarative option schema so the tool shell can render forms generically.
 export type OptionField =
