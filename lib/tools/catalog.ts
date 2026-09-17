@@ -2,7 +2,7 @@ import type { ToolDef } from "../types";
 
 // Full iLovePDF-parity catalog. `implemented: true` tools work end-to-end today;
 // others render in the UI (nothing left behind) and are clearly marked "coming soon".
-export const TOOLS: ToolDef[] = [
+const CATALOG: ToolDef[] = [
   // ---------------- Organize ----------------
   {
     slug: "merge-pdf",
@@ -668,7 +668,7 @@ export const TOOLS: ToolDef[] = [
     slug: "qr-generator",
     operation: "qr-generate",
     name: "QR Code Generator",
-    category: "barcode",
+    category: "image",
     description: "Generate QR codes for URLs, text, Wi-Fi, contacts and more.",
     accept: "image/*",
     multiple: false,
@@ -1136,6 +1136,10 @@ export const TOOLS: ToolDef[] = [
     options: [],
   },
 ];
+
+// Keep unavailable roadmap entries out of every surface until they are actually
+// implemented. This prevents dead links and avoids presenting broken tools.
+export const TOOLS: ToolDef[] = CATALOG.filter((tool) => tool.implemented);
 
 export const CATEGORY_LABELS: Record<ToolDef["category"], string> = {
   organize: "Organize PDF",

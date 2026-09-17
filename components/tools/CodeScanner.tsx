@@ -169,7 +169,7 @@ export function CodeScanner() {
                   download(
                     "timestamp,format,value\n" +
                       history
-                        .map((h) => `${h.timestamp},${h.format},"${h.value.replace(/"/g, '""')}"`)
+                        .map((h) => `${h.timestamp},${h.format},"${String(h.value).replace(/"/g, '""')}"`)
                         .join("\n"),
                     "scan-history.csv",
                     "text/csv"
