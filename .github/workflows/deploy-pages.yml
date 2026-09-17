@@ -27,12 +27,14 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
       - name: Build static site
         run: node scripts/build-github-pages.mjs
       - name: Add GitHub Pages marker
         run: touch out/.nojekyll
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: out
 
