@@ -10,6 +10,8 @@ interface ResultFile {
   filename: string;
 }
 
+const IS_STATIC_EXPORT = process.env.NEXT_PUBLIC_GITHUB_PAGES === "true";
+
 function defaultOptions(fields: OptionField[]): Record<string, string | number | boolean> {
   const out: Record<string, string | number | boolean> = {};
   for (const f of fields) {
@@ -62,11 +64,17 @@ export function ToolRunner({ tool }: { tool: ToolDef }) {
   const setOption = (name: string, value: string | number | boolean) =>
     setOptions((prev) => ({ ...prev, [name]: value }));
 
-  const process = useCallback(async () => {
+  const run = useCallback(async () => {
     setStatus("processing");
     setError("");
     setResult(null);
     try {
+      if (IS_STATIC_EXPORT && tool.runtime !== "client") {
+        throw new Error(
+          "This server-powered PDF operation is available on the Netlify deployment. GitHub Pages supports browser-only tools."
+        );
+      }
+
       // Rendering/OCR tools run entirely in the browser.
       if (tool.runtime === "client") {
         const { runClient } = await import("@/lib/client/operations");
@@ -245,7 +253,7 @@ export function ToolRunner({ tool }: { tool: ToolDef }) {
 
       <button
         disabled={!canProcess}
-        onClick={process}
+        onClick={run}
         className="w-full rounded-lg bg-brand-600 px-6 py-4 text-lg font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {status === "processing" ? "Processing…" : tool.name}

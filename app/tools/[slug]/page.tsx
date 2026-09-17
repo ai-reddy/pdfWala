@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getToolBySlug } from "@/lib/tools/catalog";
+import { getToolBySlug, TOOLS } from "@/lib/tools/catalog";
 import { ToolRunner } from "@/components/ToolRunner";
 
 export function generateStaticParams() {
-  return [];
+  return TOOLS.map((tool) => ({ slug: tool.slug }));
 }
 
 export default function ToolPage({ params }: { params: { slug: string } }) {

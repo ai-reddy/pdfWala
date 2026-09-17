@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  ...(process.env.GITHUB_PAGES === "true"
+    ? {
+        output: "export",
+        basePath: "/pdfWala",
+        assetPrefix: "/pdfWala/",
+        images: { unoptimized: true },
+      }
+    : {}),
   experimental: {
     // Allow larger request bodies for file uploads on server actions/route handlers.
     serverComponentsExternalPackages: ["pdf-lib", "jszip", "pdfjs-dist"],

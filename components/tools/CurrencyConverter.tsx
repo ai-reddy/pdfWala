@@ -5,6 +5,10 @@ import { COMMON_CURRENCIES, convertCurrency, type ExchangeRates } from "@/lib/ca
 
 const CACHE_KEY = "pdfwala:currency-rates:";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour, matches the API route's revalidate window
+const RATE_URL =
+  process.env.NEXT_PUBLIC_GITHUB_PAGES === "true"
+    ? "https://api.frankfurter.app/latest?from="
+    : "/api/currency-rates?base=";
 
 function loadCached(base: string): ExchangeRates | null {
   try {
@@ -46,9 +50,21 @@ export function CurrencyConverter() {
         setStale(false);
       }
       try {
-        const res = await fetch(`/api/currency-rates?base=${encodeURIComponent(from)}`);
+        const res = await fetch(`${RATE_URL}${encodeURIComponent(from)}`);
         if (!res.ok) throw new Error("Rate provider unavailable.");
-        const data = (await res.json()) as ExchangeRates;
+        const raw = (await res.json()) as {
+          base: string;
+          date?: string;
+          timestamp?: string;
+          rates: Record<string, number>;
+          provider?: string;
+        };
+        const data: ExchangeRates = {
+          base: raw.base,
+          timestamp: raw.timestamp ?? new Date(raw.date ?? Date.now()).toISOString(),
+          rates: { ...raw.rates, [raw.base]: 1 },
+          provider: raw.provider ?? "frankfurter.app",
+        };
         if (cancelled) return;
         setRates(data);
         setStale(false);
