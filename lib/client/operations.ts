@@ -165,12 +165,34 @@ async function ocrPdf(
 
 async function removeBackground(files: File[]): Promise<ClientResult> {
   if (!files.length) throw new Error("Upload an image.");
-  // Runs fully in-browser via WASM; the segmentation model is fetched from a
-  // CDN on first use (same pattern as tesseract.js elsewhere in this app).
-  const { removeBackground: runRemoveBackground } = await import(
-    "@imgly/background-removal"
-  );
-  const blob = await runRemoveBackground(files[0]);
+
+  let backgroundRemovalModule: any;
+  try {
+    backgroundRemovalModule = await import("@imgly/background-removal");
+  } catch (error) {
+    console.error("Background removal module failed to load:", error);
+    throw new Error(
+      "Background removal could not be initialized in this browser. Please reload the page and try again."
+    );
+  }
+
+  const removeImageBackground =
+    typeof backgroundRemovalModule?.default === "function"
+      ? backgroundRemovalModule.default
+      : typeof backgroundRemovalModule?.removeBackground === "function"
+        ? backgroundRemovalModule.removeBackground
+        : null;
+
+  if (!removeImageBackground) {
+    throw new Error("Background removal is unavailable in this browser.");
+  }
+
+  const blob = await removeImageBackground(files[0], {
+    publicPath: "https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/",
+    model: "medium",
+    output: { format: "image/png", quality: 0.8 },
+  });
+
   const base = files[0].name.replace(/\.[^.]+$/, "");
   return { filename: `${base}-transparent.png`, mimeType: "image/png", blob };
 }

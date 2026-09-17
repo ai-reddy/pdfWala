@@ -21,6 +21,7 @@
     "jszip": "^3.10.1",
     "mammoth": "^1.12.3",
     "next": "14.2.5",
+    "onnxruntime-web": "1.21.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "4.7.76",
     "qrcode": "^1.5.4",
