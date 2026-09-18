@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  ignore = "./scripts/netlify-ignore-build.sh"
 
 [build.environment]
   NODE_VERSION = "20"
